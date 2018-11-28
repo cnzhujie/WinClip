@@ -1,0 +1,6 @@
+exe/history.bin
+*.~cpp
+*.~h
+*.~ddp
+*.~dfm
+*.~bpr
