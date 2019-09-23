@@ -9,6 +9,7 @@
 #include <Forms.hpp>
 #include <ExtCtrls.hpp>
 #include <ComCtrls.hpp>
+#include <Registry.hpp>
 
 #include <ctype.h>
 #include "ClipHistory.h"
@@ -41,7 +42,6 @@ __published:	// IDE-managed Components
         TTrayIcon *tray;
         TPopupMenu *pmTray;
         TMenuItem *N1;
-        TMenuItem *N2;
         TMenuItem *N3;
         TTimer *tmrSave;
         TMemo *mmoTime;
@@ -56,7 +56,6 @@ __published:	// IDE-managed Components
         void __fastcall FormCloseQuery(TObject *Sender, bool &CanClose);
         void __fastcall trayRestore(TObject *Sender);
         void __fastcall N1Click(TObject *Sender);
-        void __fastcall N2Click(TObject *Sender);
         void __fastcall N3Click(TObject *Sender);
         void __fastcall tmrSaveTimer(TObject *Sender);
         void __fastcall edtSearchKeyDown(TObject *Sender, WORD &Key,
@@ -102,6 +101,8 @@ public:		// User declarations
         END_MESSAGE_MAP(TForm);
 
         AnsiString GetProcessNameByHandle(HWND nlHandle);
+
+        int __fastcall AutoRunCheck(bool value);
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TFormMain *FormMain;

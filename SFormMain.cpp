@@ -17,7 +17,6 @@ __fastcall TFormMain::TFormMain(TComponent* Owner)
 {
       AnsiString exePath=ExtractFileDir(Application->ExeName);
       dataPath = exePath+"\\history.bin";
-      // TODO 改成配置读取
       pClipHistory = new ClipHistory(10240);
       pClipHistory->LoadFromFile(dataPath);
       lastContent = pClipHistory->getHeadContent();
@@ -132,7 +131,7 @@ void TFormMain::ReloadClipHistoryList()
      {
          return;
      }
-     list<ClipHistoryItem*> result = pClipHistory->Search(edtSearch->Text, 100);
+     list<ClipHistoryItem*> result = pClipHistory->Search(edtSearch->Text, 500);
      //Log(SB_CLIP_DATA, IntToStr(result.size()));
      lvClipHistory->Clear();
      list<ClipHistoryItem*>::iterator it;
@@ -142,8 +141,8 @@ void TFormMain::ReloadClipHistoryList()
          ClipHistoryItem* pItem = *it;
          TListItem* pListItem = lvClipHistory->Items->Add();
          pListItem->Caption = "";
-         pListItem->SubItems->Add(pItem->content);
-         pListItem->Data = (void *)pItem->time;
+         pListItem->SubItems->Add(pItem->content.Length() > 100 ? pItem->content.SubString(1, 100) : pItem->content);
+         pListItem->Data = (void *)pItem;
      }
      if(lvClipHistory->Items->Count > 0)
      {
@@ -188,8 +187,9 @@ void __fastcall TFormMain::lvClipHistorySelectItem(TObject *Sender,
                 lvClipHistory->Items->Item[i]->Caption = IntToStr(i);
           }
           Item->Caption = "->";
-          mmoTime->Text = FormatTime((long)Item->Data);
-          mmoPreview->Text = Item->SubItems->Strings[0];
+          ClipHistoryItem* pItem = (ClipHistoryItem*)(Item->Data);
+          mmoTime->Text = FormatTime(pItem->time);
+          mmoPreview->Text = pItem->content.Length() > 200 ? (pItem->content.SubString(1, 200) + "...") : pItem->content;
       }
 }
 //---------------------------------------------------------------------------
@@ -214,11 +214,6 @@ void __fastcall TFormMain::N1Click(TObject *Sender)
        this->Show(); 
 }
 //---------------------------------------------------------------------------
-void __fastcall TFormMain::N2Click(TObject *Sender)
-{
-      //设置  
-}
-//---------------------------------------------------------------------------
 void __fastcall TFormMain::N3Click(TObject *Sender)
 {
        pClipHistory->SaveToFile(dataPath);
@@ -232,7 +227,7 @@ void __fastcall TFormMain::tmrSaveTimer(TObject *Sender)
 //---------------------------------------------------------------------------
 void TFormMain::OnSpecialKey(WORD Key)
 {
-      if(Key != VK_UP && Key != VK_DOWN && Key != VK_RETURN && Key != VK_ESCAPE)
+      if(Key != VK_UP && Key != VK_DOWN && Key != VK_RETURN && Key != VK_ESCAPE && Key != VK_DELETE)
       {
           edtSearch->SetFocus();
           return;
@@ -253,15 +248,19 @@ void TFormMain::OnSpecialKey(WORD Key)
 
       if(Key == VK_UP)
       {
-           SetSelectedInClipboardHistoryList(lvClipHistory->Selected->Index-1);
+           SetSelectedInClipboardHistoryList(lvClipHistory->Selected ? (lvClipHistory->Selected->Index-1) : 0);
       }
       else if(Key == VK_DOWN)
       {
-           SetSelectedInClipboardHistoryList(lvClipHistory->Selected->Index+1);
+           SetSelectedInClipboardHistoryList(lvClipHistory->Selected ? (lvClipHistory->Selected->Index+1) : 0);
       }
       else if(Key == VK_RETURN)
       {
            PasteAndHide();
+      }  
+      else if(Key == VK_DELETE)
+      {
+           N4Click(NULL);
       }
 }
 void TFormMain::OnCharKey(WORD Key, TShiftState Shift)
@@ -270,13 +269,19 @@ void TFormMain::OnCharKey(WORD Key, TShiftState Shift)
 }
 void TFormMain::PasteAndHide()
 {
-     Clipboard()->AsText = lvClipHistory->Selected->SubItems->Strings[0];
+     if(!lvClipHistory->Selected)
+     {
+          return;
+     }
+     ClipHistoryItem* pItem = (ClipHistoryItem*)(lvClipHistory->Selected->Data);
+
+     Clipboard()->AsText = pItem->content;
      this->Hide();
      if(lastForeground != NULL)
      {
             SetForegroundWindow(lastForeground);
 
-            if(lastWindowExeName == "mintty.exe")
+            if(lastWindowExeName == "mintty.exe" || lastWindowExeName == "Xshell.exe")
             {
                 // 模拟Shift+Ins
                 INPUT input[4];
@@ -339,6 +344,8 @@ void __fastcall TFormMain::FormCreate(TObject *Sender)
 {
       // alt+shift+v
       RegisterHotKey(this->Handle,   HOTKEY_CTRL_ALT_V,   MOD_ALT|MOD_SHIFT,   0x56);
+
+      AutoRunCheck(true);
 }
 //---------------------------------------------------------------------------
 
@@ -388,14 +395,14 @@ void __fastcall TFormMain::WMHotKey(TMessage   &Msg)
       {
             if(this->Visible)
             {
-                  SetSelectedInClipboardHistoryList(lvClipHistory->Selected->Index-1);
+                  SetSelectedInClipboardHistoryList(lvClipHistory->Selected ? (lvClipHistory->Selected->Index-1) : 0);
             }
       }
       else if(Msg.WParam == HOTKEY_DOWN)
       {
             if(this->Visible)
             {
-                  SetSelectedInClipboardHistoryList(lvClipHistory->Selected->Index+1);
+                  SetSelectedInClipboardHistoryList(lvClipHistory->Selected ? (lvClipHistory->Selected->Index+1) : 0);
             }
       }
       else if(Msg.WParam == HOTKEY_ESC)
@@ -424,8 +431,15 @@ void __fastcall TFormMain::N4Click(TObject *Sender)
       {
           return;
       }
+      int idx = lvClipHistory->Selected->Index;
       pClipHistory->Remove(lvClipHistory->Selected->SubItems->Strings[0]);
       lvClipHistory->Selected->Delete();
+
+      if(idx >= lvClipHistory->Items->Count)
+      {
+            idx = lvClipHistory->Items->Count - 1;
+      }
+      SetSelectedInClipboardHistoryList(idx);
 }
 //---------------------------------------------------------------------------
 
@@ -433,6 +447,50 @@ void __fastcall TFormMain::N4Click(TObject *Sender)
 void __fastcall TFormMain::lvClipHistoryDblClick(TObject *Sender)
 {
        PasteAndHide(); 
+}
+
+//---------------------------------------------------------------------------
+
+int __fastcall TFormMain::AutoRunCheck(bool value)
+{
+
+        int ret = 0;
+
+        TRegistry * Reg = new TRegistry;
+        AnsiString keyval="\""+Application->ExeName+"\"";
+
+        AnsiString key1="Software\\Microsoft\\Windows\\CurrentVersion\\Run\\";
+
+        Reg->RootKey=HKEY_CURRENT_USER;
+
+        if( !Reg->OpenKey(key1,false))
+        {
+                //Show msg
+        }
+        else
+        {
+             if(value)
+             {
+                  AnsiString curvalstr = Reg->ReadString("CLIP.EXE");
+                  if(curvalstr != keyval)
+                  {
+                       Reg->WriteString("CLIP.EXE",keyval);
+                  }
+                  Reg->CloseKey();
+                  ret = 1;
+             }
+             else
+             {
+                  if(Reg->DeleteValue("CLIP.EXE"))
+                  {
+                       ret = 1;
+                  }
+             }
+
+        }
+
+        delete Reg;
+        return ret;
 }
 //---------------------------------------------------------------------------
 

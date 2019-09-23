@@ -143,10 +143,6 @@ object FormMain: TFormMain
       Caption = #26174#31034
       OnClick = N1Click
     end
-    object N2: TMenuItem
-      Caption = #35774#32622
-      OnClick = N2Click
-    end
     object N3: TMenuItem
       Caption = #36864#20986
       OnClick = N3Click
